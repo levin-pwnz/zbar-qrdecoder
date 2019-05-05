@@ -2,12 +2,13 @@
 
 namespace RobbieP\ZbarQrdecoder;
 
+use Exception;
 use RobbieP\ZbarQrdecoder\Result\ErrorResult;
 use RobbieP\ZbarQrdecoder\Result\Result;
-use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
-class ZbarDecoder {
+class ZbarDecoder
+{
 
     const EXECUTABLE = 'zbarimg';
 
@@ -17,30 +18,33 @@ class ZbarDecoder {
     /**
      * @var Process
      */
-    private $processBuilder;
+    private $process;
     /**
      * @var array
      */
     private $config;
 
     /**
-     * @param array $config
-     * @param ProcessBuilder $processBuilder
+     * @param  array  $config
+     * @param  Process  $process
      */
-    function __construct($config = [], $processBuilder = null)
+    function __construct($config = [], $process = null)
     {
         $this->config = $config;
-        if(isset($this->config['path'])) {
+
+        if (isset($this->config['path'])) {
             $this->setPath($this->config['path']);
         }
-        $this->processBuilder =  is_null($processBuilder) ? new ProcessBuilder() : $processBuilder;
+
+        $this->process = is_null($process) ? new Process() : $process;
     }
 
     /**
      * Main constructor - builds the process, runs it then returns the Result object
+     *
      * @param $filename
      * @return mixed
-     * @throws \Exception
+     * @throws Exception
      */
     public function make($filename)
     {
@@ -51,21 +55,37 @@ class ZbarDecoder {
     }
 
     /**
+     * Builds the process
+     * TODO: Configurable arguments
+     *
+     * @throws Exception
+     */
+    private function buildProcess()
+    {
+        $path = $this->getPath();
+        $prefix = $path.DIRECTORY_SEPARATOR.static::EXECUTABLE;
+        $processArguments = ['-D', '--xml', '-q', $this->getFilepath()];
+        $arguments = array_merge($prefix, $processArguments);
+        return new Process($arguments);
+    }
+
+    /**
      * Returns the path to the executable zbarimg
      * Defaults to /usr/bin
-     * @throws \Exception
+     *
      * @return mixed
+     * @throws Exception
      */
     public function getPath()
     {
-        if(! $this->path ) {
+        if (!$this->path) {
             $this->setPath('/usr/bin');
         }
         return $this->path;
     }
 
     /**
-     * @param mixed $path
+     * @param  mixed  $path
      */
     public function setPath($path)
     {
@@ -81,50 +101,40 @@ class ZbarDecoder {
     }
 
     /**
-     * @param mixed $filepath
-     * @throws \Exception
+     * @param  mixed  $filepath
+     * @throws Exception
      */
     public function setFilepath($filepath)
     {
-        if(! is_file($filepath) ) {
-            throw new \Exception('Invalid filepath given');
+        if (!is_file($filepath)) {
+            throw new Exception('Invalid filepath given');
         }
         $this->file_path = $filepath;
     }
 
     /**
-     * Builds the process
-     * TODO: Configurable arguments
-     * @throws \Exception
-     */
-    private function buildProcess()
-    {
-        $path = $this->getPath();
-        $this->processBuilder->setPrefix($path . DIRECTORY_SEPARATOR . static::EXECUTABLE);
-        $this->processBuilder->setArguments(array('-D', '--xml', '-q', $this->getFilepath()))->enableOutput();
-    }
-
-    /**
      * Runs the process
-     * @throws \Exception
+     *
+     * @throws Exception
      */
     private function runProcess()
     {
-        $process = $this->processBuilder->getProcess();
+        $process = $this->process->run();
+
         try {
             $process->mustRun();
             $this->result = new Result($process->getOutput());
-        } catch (ProcessFailedException $e) {
-            switch($e->getProcess()->getExitCode()) {
+        } catch (Pro $e) {
+            switch ($e->getProcess()->getExitCode()) {
                 case 1:
-                    throw new \Exception('An error occurred while processing the image. It could be bad arguments, I/O errors and image handling errors from ImageMagick');
+                    throw new Exception('An error occurred while processing the image. It could be bad arguments, I/O errors and image handling errors from ImageMagick');
                 case 2:
-                    throw new \Exception('ImageMagick fatal error');
+                    throw new Exception('ImageMagick fatal error');
                 case 4:
                     $this->result = new ErrorResult('No barcode detected');
                     break;
                 default:
-                    throw new \Exception('Problem with decode - check you have zbar-tools installed');
+                    throw new Exception('Problem with decode - check you have zbar-tools installed');
             }
         }
 
@@ -132,6 +142,7 @@ class ZbarDecoder {
 
     /**
      * Only return the output class to the end user
+     *
      * @return mixed
      */
     private function output()
