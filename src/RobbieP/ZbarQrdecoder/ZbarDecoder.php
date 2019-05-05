@@ -66,7 +66,7 @@ class ZbarDecoder
         $prefix = $path.DIRECTORY_SEPARATOR.static::EXECUTABLE;
         $processArguments = ['-D', '--xml', '-q', $this->getFilepath()];
         $arguments = array_merge($prefix, $processArguments);
-        return new Process($arguments);
+        $this->process = new Process($arguments);
     }
 
     /**
